@@ -4,7 +4,7 @@
 # This script runs a series of curl commands to test the BankAccount API
 # and validate the caching strategy
 
-API_URL="http://localhost:5056"
+API_URL="http://localhost:5052"
 ENDPOINT="/api/BankAccount"
 HEADERS="-H \"Content-Type: application/json\""
 
