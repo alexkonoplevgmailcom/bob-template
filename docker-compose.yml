@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: bfb-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    # For development, we're not setting up authentication
+    environment:
+      - MONGO_INITDB_DATABASE=BankDB
+
+volumes:
+  mongodb_data:

@@ -38,9 +38,11 @@ public class BankAccountRepository : IBankAccountRepository
         // Try to get from cache first
         if (_memoryCache.TryGetValue(AllBankAccountsCacheKey, out IEnumerable<BankAccount>? cachedAccounts) && cachedAccounts != null)
         {
-            _logger.LogDebug("Retrieved all bank accounts from cache");
+            _logger.LogInformation("CACHE HIT: Retrieved all bank accounts from cache");
             return cachedAccounts;
         }
+        
+        _logger.LogInformation("CACHE MISS: Getting all bank accounts from database");
         
         // If not in cache, get from database with retry policy
         var bankAccounts = await _retryPolicyService.ExecuteWithRetryAsync(async () => 
@@ -55,6 +57,7 @@ public class BankAccountRepository : IBankAccountRepository
             .SetSlidingExpiration(CacheExpirationTime);
             
         _memoryCache.Set(AllBankAccountsCacheKey, bankAccounts, cacheEntryOptions);
+        _logger.LogInformation("CACHE UPDATE: Stored {Count} bank accounts in cache", bankAccounts.Count());
         
         return bankAccounts;
     }
@@ -66,9 +69,11 @@ public class BankAccountRepository : IBankAccountRepository
         // Try to get from cache first
         if (_memoryCache.TryGetValue(cacheKey, out BankAccount? cachedAccount) && cachedAccount != null)
         {
-            _logger.LogDebug("Retrieved bank account {Id} from cache", id);
+            _logger.LogInformation("CACHE HIT: Retrieved bank account {Id} from cache", id);
             return cachedAccount;
         }
+        
+        _logger.LogInformation("CACHE MISS: Getting bank account {Id} from database", id);
         
         // If not in cache, get from database with retry policy
         var bankAccount = await _retryPolicyService.ExecuteWithRetryAsync(async () => 
@@ -79,13 +84,17 @@ public class BankAccountRepository : IBankAccountRepository
         }, $"GetBankAccountById_{id}");
         
         if (bankAccount == null)
+        {
+            _logger.LogInformation("Bank account with ID {Id} not found", id);
             return null;
+        }
         
         // Store in cache
         var cacheEntryOptions = new MemoryCacheEntryOptions()
             .SetSlidingExpiration(CacheExpirationTime);
             
         _memoryCache.Set(cacheKey, bankAccount, cacheEntryOptions);
+        _logger.LogInformation("CACHE UPDATE: Stored bank account {Id} in cache", id);
         
         return bankAccount;
     }
@@ -101,12 +110,14 @@ public class BankAccountRepository : IBankAccountRepository
         
         // Invalidate the list cache since we added a new item
         _memoryCache.Remove(AllBankAccountsCacheKey);
+        _logger.LogInformation("CACHE INVALIDATE: Removed all bank accounts from cache after creating account {Id}", createdBankAccount.Id);
         
         // Add new item to cache
         string cacheKey = $"{BankAccountByIdCacheKeyPrefix}{createdBankAccount.Id}";
         var cacheEntryOptions = new MemoryCacheEntryOptions()
             .SetSlidingExpiration(CacheExpirationTime);
         _memoryCache.Set(cacheKey, createdBankAccount, cacheEntryOptions);
+        _logger.LogInformation("CACHE UPDATE: Stored new bank account {Id} in cache", createdBankAccount.Id);
         
         return createdBankAccount;
     }
@@ -116,7 +127,10 @@ public class BankAccountRepository : IBankAccountRepository
         var accountEntity = await _dbContext.Accounts.FindAsync(id);
         
         if (accountEntity == null)
+        {
+            _logger.LogInformation("Bank account with ID {Id} not found for update", id);
             return false;
+        }
             
         // Update entity properties
         accountEntity.AccountNumber = bankAccountDto.AccountNumber;
@@ -124,6 +138,8 @@ public class BankAccountRepository : IBankAccountRepository
         accountEntity.Balance = bankAccountDto.Balance;
         accountEntity.AccountTypeId = (int)bankAccountDto.Type;
         accountEntity.IsActive = bankAccountDto.IsActive;
+        accountEntity.BankId = bankAccountDto.BankId;
+        accountEntity.BranchId = bankAccountDto.BranchId;
         
         _dbContext.Accounts.Update(accountEntity);
         await _dbContext.SaveChangesAsync();
@@ -132,12 +148,14 @@ public class BankAccountRepository : IBankAccountRepository
         string cacheKey = $"{BankAccountByIdCacheKeyPrefix}{id}";
         _memoryCache.Remove(cacheKey);
         _memoryCache.Remove(AllBankAccountsCacheKey);
+        _logger.LogInformation("CACHE INVALIDATE: Removed bank account {Id} and all accounts list from cache after update", id);
         
         // Add updated item to cache
         var updatedBankAccount = MapToDto(accountEntity);
         var cacheEntryOptions = new MemoryCacheEntryOptions()
             .SetSlidingExpiration(CacheExpirationTime);
         _memoryCache.Set(cacheKey, updatedBankAccount, cacheEntryOptions);
+        _logger.LogInformation("CACHE UPDATE: Stored updated bank account {Id} in cache", id);
         
         return true;
     }
@@ -147,7 +165,10 @@ public class BankAccountRepository : IBankAccountRepository
         var accountEntity = await _dbContext.Accounts.FindAsync(id);
         
         if (accountEntity == null)
+        {
+            _logger.LogInformation("Bank account with ID {Id} not found for deletion", id);
             return false;
+        }
             
         _dbContext.Accounts.Remove(accountEntity);
         await _dbContext.SaveChangesAsync();
@@ -156,6 +177,7 @@ public class BankAccountRepository : IBankAccountRepository
         string cacheKey = $"{BankAccountByIdCacheKeyPrefix}{id}";
         _memoryCache.Remove(cacheKey);
         _memoryCache.Remove(AllBankAccountsCacheKey);
+        _logger.LogInformation("CACHE INVALIDATE: Removed bank account {Id} and all accounts list from cache after deletion", id);
         
         return true;
     }
@@ -171,7 +193,9 @@ public class BankAccountRepository : IBankAccountRepository
             Balance = account.Balance,
             Type = (AccountType)account.AccountTypeId,
             CreatedDate = account.CreatedDate,
-            IsActive = account.IsActive
+            IsActive = account.IsActive,
+            BankId = account.BankId,
+            BranchId = account.BranchId
         };
     }
 
@@ -186,7 +210,9 @@ public class BankAccountRepository : IBankAccountRepository
             Balance = bankAccount.Balance,
             AccountTypeId = (int)bankAccount.Type,
             CreatedDate = bankAccount.CreatedDate,
-            IsActive = bankAccount.IsActive
+            IsActive = bankAccount.IsActive,
+            BankId = bankAccount.BankId,
+            BranchId = bankAccount.BranchId
         };
     }
 }

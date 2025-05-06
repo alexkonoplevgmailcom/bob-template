@@ -9,4 +9,6 @@ public class Account
     public int AccountTypeId { get; set; }
     public DateTime CreatedDate { get; set; }
     public bool IsActive { get; set; }
+    public int BankId { get; set; }
+    public int BranchId { get; set; }
 }
