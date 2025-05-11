@@ -17,6 +17,7 @@
     <ProjectReference Include="..\BFB.DataAccess.MSSQL\BFB.DataAccess.MSSQL.csproj" />
     <ProjectReference Include="..\BFB.DataAccess.DB2\BFB.DataAccess.DB2.csproj" />
     <ProjectReference Include="..\BFB.DataAccess.Mongo\BFB.DataAccess.Mongo.csproj" />
+    <ProjectReference Include="..\BFB.DataAccess.RestApi\BFB.DataAccess.RestApi.csproj" />
   </ItemGroup>
 
 </Project>

@@ -3,6 +3,7 @@ using BFB.BusinessServices;
 using BFB.DataAccess.DB2;
 using BFB.DataAccess.MSSQL;
 using BFB.DataAccess.Mongo;
+using BFB.DataAccess.RestApi;
  
 using Microsoft.EntityFrameworkCore;
 using MongoDB.Driver;
@@ -46,14 +47,6 @@ try
 {
     // Register DB2 data access services
     builder.Services.AddDB2DataAccess();
-    
-    // Initialize DB2 database tables
-    using (var scope = builder.Services.BuildServiceProvider().CreateScope())
-    {
-        var db2Context = scope.ServiceProvider.GetRequiredService<BankDB2Context>();
-        db2Context.InitializeDatabaseAsync().Wait();
-    }
-    
     Console.WriteLine("DB2 services registered successfully");
 }
 catch (Exception ex)
@@ -61,6 +54,18 @@ catch (Exception ex)
     useDB2 = false;
     Console.WriteLine($"DB2 initialization failed: {ex.Message}");
     Console.WriteLine("Running without DB2 support. Customer data will not be available.");
+}
+
+// Register REST API data access services
+try
+{
+    builder.Services.AddRestApiDataAccess(builder.Configuration, builder.Environment);
+    Console.WriteLine("REST API data access services registered successfully");
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"REST API data access initialization failed: {ex.Message}");
+    Console.WriteLine("Running without Transaction API support. Transaction data will not be available.");
 }
 
 // Register business services
