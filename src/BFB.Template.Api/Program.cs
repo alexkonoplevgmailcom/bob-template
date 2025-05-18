@@ -48,7 +48,7 @@ bool useDB2 = true;
 try
 {
     // Register DB2 data access services
-    builder.Services.AddDB2DataAccess();
+    builder.Services.AddDB2DataAccess(builder.Configuration);
     Console.WriteLine("DB2 services registered successfully");
 }
 catch (Exception ex)
@@ -90,6 +90,19 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.CustomSchemaIds(type => type.ToString());
     
+    // Define Swagger document with API information
+    options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Title = "Banking Facility Backend API",
+        Version = "v1",
+        Description = "A robust banking facility backend system that provides RESTful APIs for managing bank accounts, branches, customers, and their accounts.",
+        Contact = new Microsoft.OpenApi.Models.OpenApiContact
+        {
+            Name = "Banking API Support",
+            Email = "support@banking-api.com"
+        }
+    });
+    
     // Add XML comments for Swagger documentation
     var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
@@ -108,11 +121,14 @@ builder.Services.AddSwaggerGen(options =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+// Always enable Swagger regardless of environment
+app.UseSwagger();
+app.UseSwaggerUI(options =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "Banking Facility Backend API");
+    // Set Swagger UI as the startup page
+    options.RoutePrefix = string.Empty;
+});
 
 // Add global exception handler middleware
 app.UseMiddleware<BFB.Template.Api.Middleware.GlobalExceptionHandlerMiddleware>();

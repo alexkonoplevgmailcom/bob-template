@@ -10,7 +10,7 @@ public class BankDB2Context
     public BankDB2Context(IConfiguration configuration)
     {
         _connectionString = configuration.GetConnectionString("DB2Connection") ?? 
-            "Server=localhost:50000;Database=BankDB;UID=db2inst1;PWD=db2inst1-pwd;";
+            throw new InvalidOperationException("DB2Connection string is not configured in appsettings.json");
     }
 
     public DB2Connection CreateConnection()

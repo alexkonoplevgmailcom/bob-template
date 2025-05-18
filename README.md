@@ -1,6 +1,6 @@
 # Banking Facility Backend (BFB)
 
-A robust banking facility backend system that provides RESTful APIs for managing bank accounts, branches, customers, and their accounts. The system is built using ASP.NET Core and supports multiple database systems including Microsoft SQL Server, MongoDB, and IBM DB2.
+A robust banking facility backend system that provides RESTful APIs for managing bank accounts, branches, customers, and their accounts. The system is built using ASP.NET Core and supports multiple database systems including Microsoft SQL Server, MongoDB, IBM DB2, and a REST API for transactions.
 
 ## Features
 
@@ -8,14 +8,16 @@ A robust banking facility backend system that provides RESTful APIs for managing
   - Microsoft SQL Server for bank account management
   - MongoDB for bank branch management
   - IBM DB2 for customer data management
+  - REST API for transaction management
 - Comprehensive REST API endpoints
-- Built-in caching mechanism
 - Retry policies for improved reliability
 - Swagger/OpenAPI documentation
+- Global exception handling
+- Model validation
 
 ## Prerequisites
 
-- .NET 6.0 SDK or later
+- .NET 8.0 SDK or later
 - Docker and Docker Compose
 - One of the following database systems:
   - Microsoft SQL Server 2019 or later
@@ -39,9 +41,8 @@ docker-compose up -d
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost;Database=BFBTemplateDB;...",
-    "MongoConnection": "mongodb://localhost:27017",
-    "DB2Connection": "Server=localhost:50000;Database=BankDB;..."
+    "DefaultConnection": "Server=localhost;Database=BFBTemplateDB;Trusted_Connection=True;TrustServerCertificate=True;",
+    "MongoConnection": "mongodb://localhost:27017/BankDatabase?authSource=admin"
   }
 }
 ```
@@ -71,11 +72,23 @@ Key configuration sections:
     "RetryDelayInMilliseconds": 500
   },
   "MongoDB": {
-    "DatabaseName": "BankDB",
+    "DatabaseName": "BankDatabase",
     "UseAuthentication": false
   }
 }
 ```
+
+## Project Structure
+
+The solution is organized into several projects:
+
+- **Abstractions**: Contains interfaces, DTOs, and exceptions shared across the solution
+- **BFB.BusinessServices**: Business logic implementation
+- **BFB.DataAccess.MSSQL**: Data access for bank accounts using SQL Server
+- **BFB.DataAccess.Mongo**: Data access for bank branches using MongoDB
+- **BFB.DataAccess.DB2**: Data access for customer data using IBM DB2
+- **BFB.DataAccess.RestApi**: Data access for transactions using REST API
+- **BFB.Template.Api**: Main API project with controllers and middleware
 
 ## API Endpoints
 
@@ -121,6 +134,15 @@ Key configuration sections:
 | PUT | `/api/customeraccounts/{id}` | Updates an existing customer account. Returns 200 OK on success, 404 Not Found if account doesn't exist. | **Request:** Same as POST request format |
 | DELETE | `/api/customeraccounts/{id}` | Deletes a customer account. Returns 200 OK on success, 404 Not Found if account doesn't exist. | No request body required |
 
+### Transaction Endpoints
+
+| Method | Endpoint | Description | Request/Response Details |
+|--------|----------|-------------|------------------------|
+| GET | `/api/transactions` | Retrieves all transactions. Returns 200 OK on success. | **Response:** Array of transaction objects |
+| GET | `/api/transactions/{id}` | Retrieves a specific transaction by ID. Returns 200 OK on success, 404 Not Found if transaction doesn't exist. | **Response:** Single transaction object |
+| GET | `/api/transactions/account/{accountId}` | Retrieves all transactions for a specific account. Returns 200 OK on success. | **Response:** Array of transaction objects |
+| POST | `/api/transactions` | Creates a new transaction. Returns 201 Created on success, 400 Bad Request if validation fails. | **Request:**<br>```json<br>{<br>  "accountId": 1,<br>  "amount": 100.00,<br>  "type": "Deposit",<br>  "description": "ATM Deposit"<br>}<br>``` |
+
 ### Common HTTP Status Codes
 
 - 200 OK: Successful GET, PUT, DELETE operations
@@ -145,6 +167,14 @@ Use the provided PowerShell script to populate sample data:
 
 ```powershell
 .\scripts\PopulateData.ps1
+```
+
+You can also use the provided shell scripts for testing the API:
+```bash
+./test-api.sh
+./test-branch-api.sh
+./test-transaction-api.sh
+./create-bank-accounts.sh
 ```
 
 ## License
