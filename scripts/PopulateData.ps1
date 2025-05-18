@@ -2,7 +2,7 @@
 # This script populates sample data for the BFB Template API by calling its controllers
 
 # Configuration
-$apiBaseUrl = "https://localhost:7107" # Update this with your API's base URL
+$apiBaseUrl = "http://localhost:5053" # Updated to match the running API's URL
 $headers = @{ "Content-Type" = "application/json" }
 
 Write-Host "Starting data population for BFB Template API..." -ForegroundColor Cyan

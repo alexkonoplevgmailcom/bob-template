@@ -78,6 +78,25 @@ Key configuration sections:
 }
 ```
 
+## Testing Scripts
+
+The project includes several PowerShell scripts in the `scripts` folder to test and interact with the API:
+
+- `create-bank-accounts.ps1`: Creates test bank accounts
+- `test-api.ps1`: Tests the BankAccount API functionality and cache behavior
+- `test-branch-api.ps1`: Tests the BankBranch API functionality
+- `test-transaction-api.ps1`: Tests the Transaction API functionality
+- `PopulateData.ps1`: Populates the database with comprehensive sample data
+
+To run the scripts (requires PowerShell):
+
+```bash
+cd scripts
+pwsh ./create-bank-accounts.ps1
+```
+
+For more details, see the [Scripts README](scripts/README.md).
+
 ## Project Structure
 
 The solution is organized into several projects:
