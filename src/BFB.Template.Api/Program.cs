@@ -4,6 +4,8 @@ using BFB.DataAccess.DB2;
 using BFB.DataAccess.MSSQL;
 using BFB.DataAccess.Mongo;
 using BFB.DataAccess.RestApi;
+using BFB.Template.Api.Extensions;
+using BFB.Template.Api.Middleware;
  
 using Microsoft.EntityFrameworkCore;
 using MongoDB.Driver;
@@ -71,10 +73,37 @@ catch (Exception ex)
 // Register business services
 builder.Services.AddBusinessServices();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+    {
+        // Add global validation filter to handle model validation
+        options.Filters.Add<BFB.Template.Api.Middleware.ValidationModelHandlerAttribute>();
+    })
+    .AddJsonOptions(options =>
+    {
+        // Use camelCase for JSON property names
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    });
+
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.CustomSchemaIds(type => type.ToString());
+    
+    // Add XML comments for Swagger documentation
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+    {
+        options.IncludeXmlComments(xmlPath);
+    }
+    
+    // Define error responses
+    options.AddServer(new Microsoft.OpenApi.Models.OpenApiServer
+    {
+        Description = "Banking API Server"
+    });
+});
 
 var app = builder.Build();
 
@@ -84,6 +113,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// Add global exception handler middleware
+app.UseMiddleware<BFB.Template.Api.Middleware.GlobalExceptionHandlerMiddleware>();
 
 app.UseHttpsRedirection();
 

@@ -1,5 +1,6 @@
 using Abstractions.DTO;
 using Abstractions.Interfaces;
+using BFB.Template.Api.Extensions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BFB.Template.Api.Controllers;
@@ -27,8 +28,7 @@ public class CustomersController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving all customers");
-            return StatusCode(500, "An error occurred while retrieving customers");
+            return this.CreateInternalServerErrorResponse("Error retrieving all customers", ex);
         }
     }
 
@@ -40,14 +40,13 @@ public class CustomersController : ControllerBase
             var customer = await _customerService.GetCustomerByIdAsync(id);
             if (customer == null)
             {
-                return NotFound($"Customer with ID {id} not found");
+                return this.CreateNotFoundResponse($"Customer with ID {id} not found");
             }
             return Ok(customer);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving customer {Id}", id);
-            return StatusCode(500, $"An error occurred while retrieving customer {id}");
+            return this.CreateInternalServerErrorResponse($"Error retrieving customer {id}", ex);
         }
     }
 
@@ -61,12 +60,11 @@ public class CustomersController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return this.CreateBadRequestResponse(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating customer");
-            return StatusCode(500, "An error occurred while creating the customer");
+            return this.CreateInternalServerErrorResponse("Error creating customer", ex);
         }
     }
 
@@ -77,24 +75,23 @@ public class CustomersController : ControllerBase
         {
             if (id != customer.Id)
             {
-                return BadRequest("ID in route does not match ID in customer object");
+                return this.CreateBadRequestResponse("ID in route does not match ID in customer object");
             }
 
             var success = await _customerService.UpdateCustomerAsync(id, customer);
             if (!success)
             {
-                return NotFound($"Customer with ID {id} not found");
+                return this.CreateNotFoundResponse($"Customer with ID {id} not found");
             }
             return NoContent();
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return this.CreateBadRequestResponse(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating customer {Id}", id);
-            return StatusCode(500, $"An error occurred while updating customer {id}");
+            return this.CreateInternalServerErrorResponse($"Error updating customer {id}", ex);
         }
     }
 
@@ -106,14 +103,13 @@ public class CustomersController : ControllerBase
             var success = await _customerService.DeleteCustomerAsync(id);
             if (!success)
             {
-                return NotFound($"Customer with ID {id} not found");
+                return this.CreateNotFoundResponse($"Customer with ID {id} not found");
             }
             return NoContent();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting customer {Id}", id);
-            return StatusCode(500, $"An error occurred while deleting customer {id}");
+            return this.CreateInternalServerErrorResponse($"Error deleting customer {id}", ex);
         }
     }
 }

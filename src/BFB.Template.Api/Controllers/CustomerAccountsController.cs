@@ -1,5 +1,6 @@
 using Abstractions.DTO;
 using Abstractions.Interfaces;
+using BFB.Template.Api.Extensions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BFB.Template.Api.Controllers;
@@ -27,8 +28,7 @@ public class CustomerAccountsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving all customer accounts");
-            return StatusCode(500, "An error occurred while retrieving customer accounts");
+            return this.CreateInternalServerErrorResponse("Error retrieving all customer accounts", ex);
         }
     }
 
@@ -40,14 +40,13 @@ public class CustomerAccountsController : ControllerBase
             var account = await _customerAccountService.GetCustomerAccountByIdAsync(id);
             if (account == null)
             {
-                return NotFound($"Customer account with ID {id} not found");
+                return this.CreateNotFoundResponse($"Customer account with ID {id} not found");
             }
             return Ok(account);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving customer account {Id}", id);
-            return StatusCode(500, $"An error occurred while retrieving customer account {id}");
+            return this.CreateInternalServerErrorResponse($"Error retrieving customer account {id}", ex);
         }
     }
 
@@ -61,8 +60,7 @@ public class CustomerAccountsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving accounts for customer {CustomerId}", customerId);
-            return StatusCode(500, $"An error occurred while retrieving accounts for customer {customerId}");
+            return this.CreateInternalServerErrorResponse($"Error retrieving accounts for customer {customerId}", ex);
         }
     }
 
@@ -76,12 +74,11 @@ public class CustomerAccountsController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return this.CreateBadRequestResponse(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating customer account");
-            return StatusCode(500, "An error occurred while creating the customer account");
+            return this.CreateInternalServerErrorResponse("Error creating customer account", ex);
         }
     }
 
@@ -92,24 +89,23 @@ public class CustomerAccountsController : ControllerBase
         {
             if (id != account.Id)
             {
-                return BadRequest("ID in route does not match ID in account object");
+                return this.CreateBadRequestResponse("ID in route does not match ID in account object");
             }
 
             var success = await _customerAccountService.UpdateCustomerAccountAsync(id, account);
             if (!success)
             {
-                return NotFound($"Customer account with ID {id} not found");
+                return this.CreateNotFoundResponse($"Customer account with ID {id} not found");
             }
             return NoContent();
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return this.CreateBadRequestResponse(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating customer account {Id}", id);
-            return StatusCode(500, $"An error occurred while updating customer account {id}");
+            return this.CreateInternalServerErrorResponse($"Error updating customer account {id}", ex);
         }
     }
 
@@ -121,14 +117,13 @@ public class CustomerAccountsController : ControllerBase
             var success = await _customerAccountService.DeleteCustomerAccountAsync(id);
             if (!success)
             {
-                return NotFound($"Customer account with ID {id} not found");
+                return this.CreateNotFoundResponse($"Customer account with ID {id} not found");
             }
             return NoContent();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting customer account {Id}", id);
-            return StatusCode(500, $"An error occurred while deleting customer account {id}");
+            return this.CreateInternalServerErrorResponse($"Error deleting customer account {id}", ex);
         }
     }
 }

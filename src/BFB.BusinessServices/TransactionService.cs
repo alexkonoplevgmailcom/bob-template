@@ -1,4 +1,5 @@
 using Abstractions.DTO;
+using Abstractions.Exceptions;
 using Abstractions.Interfaces;
 using Microsoft.Extensions.Logging;
 
@@ -29,16 +30,21 @@ public class TransactionService : ITransactionService
             if (account == null)
             {
                 _logger.LogWarning("Attempted to retrieve transactions for non-existent account ID: {AccountId}", accountId);
-                throw new ArgumentException($"Account with ID {accountId} does not exist", nameof(accountId));
+                throw new ResourceNotFoundException("Bank Account", accountId);
             }
 
             _logger.LogInformation("Retrieving transactions for account ID: {AccountId}", accountId);
             return await _transactionRepository.GetTransactionsByAccountIdAsync(accountId);
         }
-        catch (Exception ex) when (ex is not ArgumentException)
+        catch (ResourceNotFoundException)
+        {
+            // Re-throw ResourceNotFoundException as is
+            throw;
+        }
+        catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving transactions for account ID: {AccountId}", accountId);
-            throw;
+            throw new DataAccessException($"Failed to retrieve transactions for account ID {accountId}", ex);
         }
     }
 
@@ -47,12 +53,24 @@ public class TransactionService : ITransactionService
         try
         {
             _logger.LogInformation("Retrieving transaction with ID: {TransactionId}", transactionId);
-            return await _transactionRepository.GetTransactionByIdAsync(transactionId);
+            var transaction = await _transactionRepository.GetTransactionByIdAsync(transactionId);
+            
+            if (transaction == null)
+            {
+                throw new ResourceNotFoundException("Transaction", transactionId);
+            }
+            
+            return transaction;
+        }
+        catch (ResourceNotFoundException)
+        {
+            // Re-throw ResourceNotFoundException as is
+            throw;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving transaction with ID: {TransactionId}", transactionId);
-            throw;
+            throw new DataAccessException($"Failed to retrieve transaction with ID {transactionId}", ex);
         }
     }
 
@@ -63,7 +81,7 @@ public class TransactionService : ITransactionService
             // Validate parameters
             if (startDate > endDate)
             {
-                throw new ArgumentException("Start date must be before or equal to end date");
+                throw new BusinessValidationException("Start date must be before or equal to end date");
             }
 
             // Verify the account exists
@@ -71,18 +89,28 @@ public class TransactionService : ITransactionService
             if (account == null)
             {
                 _logger.LogWarning("Attempted to retrieve transactions for non-existent account ID: {AccountId}", accountId);
-                throw new ArgumentException($"Account with ID {accountId} does not exist", nameof(accountId));
+                throw new ResourceNotFoundException("Bank Account", accountId);
             }
 
             _logger.LogInformation("Retrieving transactions for account ID: {AccountId} from {StartDate} to {EndDate}", 
                 accountId, startDate, endDate);
             return await _transactionRepository.GetTransactionsByDateRangeAsync(accountId, startDate, endDate);
         }
-        catch (Exception ex) when (ex is not ArgumentException)
+        catch (ResourceNotFoundException)
+        {
+            // Re-throw ResourceNotFoundException as is
+            throw;
+        }
+        catch (BusinessValidationException)
+        {
+            // Re-throw BusinessValidationException as is
+            throw;
+        }
+        catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving transactions for account ID: {AccountId} from {StartDate} to {EndDate}", 
                 accountId, startDate, endDate);
-            throw;
+            throw new DataAccessException($"Failed to retrieve transactions for account ID {accountId} in the specified date range", ex);
         }
     }
 
@@ -93,17 +121,17 @@ public class TransactionService : ITransactionService
             // Validate transaction
             if (transaction.AccountId <= 0)
             {
-                throw new ArgumentException("Account ID is required", nameof(transaction));
+                throw new BusinessValidationException("Account ID is required");
             }
 
             if (transaction.Amount == 0)
             {
-                throw new ArgumentException("Transaction amount cannot be zero", nameof(transaction));
+                throw new BusinessValidationException("Transaction amount cannot be zero");
             }
 
             if (string.IsNullOrWhiteSpace(transaction.TransactionType))
             {
-                throw new ArgumentException("Transaction type is required", nameof(transaction));
+                throw new BusinessValidationException("Transaction type is required");
             }
 
             // Verify the account exists
@@ -111,7 +139,7 @@ public class TransactionService : ITransactionService
             if (account == null)
             {
                 _logger.LogWarning("Attempted to create transaction for non-existent account ID: {AccountId}", transaction.AccountId);
-                throw new ArgumentException($"Account with ID {transaction.AccountId} does not exist", nameof(transaction));
+                throw new ResourceNotFoundException("Bank Account", transaction.AccountId);
             }
 
             // For withdrawals and transfers, check if account has sufficient funds
@@ -122,7 +150,7 @@ public class TransactionService : ITransactionService
             {
                 _logger.LogWarning("Insufficient funds for transaction on account ID: {AccountId}. Balance: {Balance}, Transaction amount: {Amount}", 
                     transaction.AccountId, account.Balance, transaction.Amount);
-                throw new InvalidOperationException("Insufficient funds for this transaction");
+                throw new BusinessValidationException("Insufficient funds for this transaction");
             }
 
             // Set default values
@@ -139,11 +167,21 @@ public class TransactionService : ITransactionService
             
             return createdTransaction;
         }
-        catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException)
+        catch (ResourceNotFoundException)
+        {
+            // Re-throw ResourceNotFoundException as is
+            throw;
+        }
+        catch (BusinessValidationException)
+        {
+            // Re-throw BusinessValidationException as is
+            throw;
+        }
+        catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating {TransactionType} transaction for account ID: {AccountId} with amount: {Amount}", 
                 transaction.TransactionType, transaction.AccountId, transaction.Amount);
-            throw;
+            throw new DataAccessException($"Failed to create transaction for account ID {transaction.AccountId}", ex);
         }
     }
 }

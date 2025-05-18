@@ -1,4 +1,5 @@
 using Abstractions.DTO;
+using Abstractions.Exceptions;
 using Abstractions.Interfaces;
 using Microsoft.Extensions.Logging;
 
@@ -30,7 +31,7 @@ public class CustomerAccountService : ICustomerAccountService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving all customer accounts");
-            throw;
+            throw new DataAccessException("Failed to retrieve customer accounts", ex);
         }
     }
 
@@ -39,12 +40,24 @@ public class CustomerAccountService : ICustomerAccountService
         try
         {
             _logger.LogInformation("Retrieving customer account with ID: {AccountId}", id);
-            return await _accountRepository.GetAccountByIdAsync(id);
+            var account = await _accountRepository.GetAccountByIdAsync(id);
+            
+            if (account == null)
+            {
+                throw new ResourceNotFoundException("Customer Account", id);
+            }
+            
+            return account;
+        }
+        catch (ResourceNotFoundException)
+        {
+            // Re-throw ResourceNotFoundException as is
+            throw;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving customer account with ID: {AccountId}", id);
-            throw;
+            throw new DataAccessException($"Failed to retrieve customer account with ID {id}", ex);
         }
     }
 
@@ -52,13 +65,25 @@ public class CustomerAccountService : ICustomerAccountService
     {
         try
         {
+            // Check if customer exists
+            var customer = await _customerRepository.GetCustomerByIdAsync(customerId);
+            if (customer == null)
+            {
+                throw new ResourceNotFoundException("Customer", customerId);
+            }
+            
             _logger.LogInformation("Retrieving accounts for customer with ID: {CustomerId}", customerId);
             return await _accountRepository.GetAccountsByCustomerIdAsync(customerId);
+        }
+        catch (ResourceNotFoundException)
+        {
+            // Re-throw ResourceNotFoundException as is
+            throw;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving accounts for customer with ID: {CustomerId}", customerId);
-            throw;
+            throw new DataAccessException($"Failed to retrieve accounts for customer with ID {customerId}", ex);
         }
     }
 
@@ -67,78 +92,108 @@ public class CustomerAccountService : ICustomerAccountService
         // Add business validation
         if (string.IsNullOrWhiteSpace(customerAccount.AccountNumber))
         {
-            throw new ArgumentException("Account number cannot be empty", nameof(customerAccount));
+            throw new BusinessValidationException("Account number cannot be empty");
         }
 
         if (customerAccount.Balance < 0)
         {
-            throw new ArgumentException("Initial balance cannot be negative", nameof(customerAccount));
+            throw new BusinessValidationException("Initial balance cannot be negative");
         }
-
-        // Validate Customer exists
-        var customer = await _customerRepository.GetCustomerByIdAsync(customerAccount.CustomerId);
-        if (customer == null)
-        {
-            throw new ArgumentException($"Customer with ID {customerAccount.CustomerId} does not exist", nameof(customerAccount));
-        }
-
-        // Set default values
-        customerAccount.CreatedDate = DateTime.UtcNow;
-        customerAccount.IsActive = true;
 
         try
         {
+            // Validate Customer exists
+            var customer = await _customerRepository.GetCustomerByIdAsync(customerAccount.CustomerId);
+            if (customer == null)
+            {
+                throw new ResourceNotFoundException("Customer", customerAccount.CustomerId);
+            }
+
+            // Set default values
+            customerAccount.CreatedDate = DateTime.UtcNow;
+            customerAccount.IsActive = true;
+
             _logger.LogInformation("Creating new customer account: {AccountNumber} for customer ID: {CustomerId}", 
                 customerAccount.AccountNumber, customerAccount.CustomerId);
             
             return await _accountRepository.CreateAccountAsync(customerAccount);
         }
+        catch (ResourceNotFoundException)
+        {
+            // Re-throw ResourceNotFoundException as is
+            throw;
+        }
+        catch (BusinessValidationException)
+        {
+            // Re-throw BusinessValidationException as is
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating customer account: {AccountNumber} for customer ID: {CustomerId}", 
                 customerAccount.AccountNumber, customerAccount.CustomerId);
-            throw;
+            throw new DataAccessException("Failed to create customer account", ex);
         }
     }
 
     public async Task<bool> UpdateCustomerAccountAsync(int id, CustomerAccount customerAccount)
     {
-        // Verify that the account exists
-        var existingAccount = await _accountRepository.GetAccountByIdAsync(id);
-        if (existingAccount == null)
-        {
-            _logger.LogWarning("Customer account with ID {AccountId} not found for update", id);
-            return false;
-        }
-
-        // Add business validation
-        if (string.IsNullOrWhiteSpace(customerAccount.AccountNumber))
-        {
-            throw new ArgumentException("Account number cannot be empty", nameof(customerAccount));
-        }
-
-        // Validate Customer exists if changing customer
-        if (customerAccount.CustomerId != existingAccount.CustomerId)
-        {
-            var customer = await _customerRepository.GetCustomerByIdAsync(customerAccount.CustomerId);
-            if (customer == null)
+        try {
+            // Verify that the account exists
+            var existingAccount = await _accountRepository.GetAccountByIdAsync(id);
+            if (existingAccount == null)
             {
-                throw new ArgumentException($"Customer with ID {customerAccount.CustomerId} does not exist", nameof(customerAccount));
+                throw new ResourceNotFoundException("Customer Account", id);
             }
-        }
 
-        // Preserve creation date from the existing account
-        customerAccount.CreatedDate = existingAccount.CreatedDate;
+            // Add business validation
+            if (string.IsNullOrWhiteSpace(customerAccount.AccountNumber))
+            {
+                throw new BusinessValidationException("Account number cannot be empty");
+            }
 
-        try
-        {
+            // Validate Customer exists if changing customer
+            if (customerAccount.CustomerId != existingAccount.CustomerId)
+            {
+                var customer = await _customerRepository.GetCustomerByIdAsync(customerAccount.CustomerId);
+                if (customer == null)
+                {
+                    throw new ResourceNotFoundException("Customer", customerAccount.CustomerId);
+                }
+            }
+
+            // Preserve creation date from the existing account
+            customerAccount.CreatedDate = existingAccount.CreatedDate;
+
             _logger.LogInformation("Updating customer account with ID: {AccountId}", id);
-            return await _accountRepository.UpdateAccountAsync(id, customerAccount);
+            var result = await _accountRepository.UpdateAccountAsync(id, customerAccount);
+            
+            if (!result)
+            {
+                throw new DataAccessException($"Failed to update customer account with ID {id}");
+            }
+            
+            return true;
+        }
+        catch (ResourceNotFoundException)
+        {
+            // Re-throw ResourceNotFoundException as is
+            throw;
+        }
+        catch (BusinessValidationException)
+        {
+            // Re-throw BusinessValidationException as is
+            throw;
+        }
+        catch (DataAccessException)
+        {
+            // Re-throw DataAccessException as is
+            throw;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating customer account with ID: {AccountId}", id);
-            throw;
+            throw new DataAccessException($"Failed to update customer account with ID {id}", ex);
         }
     }
 
@@ -147,12 +202,24 @@ public class CustomerAccountService : ICustomerAccountService
         try
         {
             _logger.LogInformation("Deleting customer account with ID: {AccountId}", id);
-            return await _accountRepository.DeleteAccountAsync(id);
+            var result = await _accountRepository.DeleteAccountAsync(id);
+            
+            if (!result)
+            {
+                throw new ResourceNotFoundException("Customer Account", id);
+            }
+            
+            return true;
+        }
+        catch (ResourceNotFoundException)
+        {
+            // Re-throw ResourceNotFoundException as is
+            throw;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting customer account with ID: {AccountId}", id);
-            throw;
+            throw new DataAccessException($"Failed to delete customer account with ID {id}", ex);
         }
     }
 }

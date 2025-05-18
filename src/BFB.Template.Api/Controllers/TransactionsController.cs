@@ -1,5 +1,6 @@
 using Abstractions.DTO;
 using Abstractions.Interfaces;
+using BFB.Template.Api.Extensions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BFB.Template.Api.Controllers;
@@ -27,14 +28,13 @@ public class TransactionsController : ControllerBase
             var transaction = await _transactionService.GetTransactionByIdAsync(id);
             if (transaction == null)
             {
-                return NotFound();
+                return this.CreateNotFoundResponse($"Transaction with ID {id} not found");
             }
             return Ok(transaction);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving transaction with ID {Id}", id);
-            return StatusCode(500, "An error occurred while retrieving the transaction");
+            return this.CreateInternalServerErrorResponse($"Error retrieving transaction with ID {id}", ex);
         }
     }
 
@@ -48,12 +48,11 @@ public class TransactionsController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return NotFound(ex.Message);
+            return this.CreateNotFoundResponse(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving transactions for account ID {AccountId}", accountId);
-            return StatusCode(500, "An error occurred while retrieving transactions");
+            return this.CreateInternalServerErrorResponse($"Error retrieving transactions for account ID {accountId}", ex);
         }
     }
 
@@ -70,13 +69,13 @@ public class TransactionsController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return this.CreateBadRequestResponse(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving transactions for account ID {AccountId} from {StartDate} to {EndDate}", 
-                accountId, startDate, endDate);
-            return StatusCode(500, "An error occurred while retrieving transactions");
+            return this.CreateInternalServerErrorResponse(
+                $"Error retrieving transactions for account ID {accountId} from {startDate} to {endDate}",
+                ex);
         }
     }
 
@@ -90,16 +89,15 @@ public class TransactionsController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return this.CreateBadRequestResponse(ex.Message);
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(ex.Message);
+            return this.CreateBadRequestResponse(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating transaction for account ID {AccountId}", transaction.AccountId);
-            return StatusCode(500, "An error occurred while creating the transaction");
+            return this.CreateInternalServerErrorResponse($"Error creating transaction for account ID {transaction.AccountId}", ex);
         }
     }
 }

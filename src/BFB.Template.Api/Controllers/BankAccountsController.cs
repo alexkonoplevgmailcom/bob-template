@@ -1,5 +1,6 @@
 using Abstractions.DTO;
 using Abstractions.Interfaces;
+using BFB.Template.Api.Extensions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BFB.Template.Api.Controllers;
@@ -27,8 +28,7 @@ public class BankAccountsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving all bank accounts");
-            return StatusCode(500, "An error occurred while retrieving bank accounts");
+            return this.CreateInternalServerErrorResponse("Error retrieving all bank accounts", ex);
         }
     }
 
@@ -40,14 +40,13 @@ public class BankAccountsController : ControllerBase
             var account = await _bankAccountService.GetBankAccountByIdAsync(id);
             if (account == null)
             {
-                return NotFound($"Bank account with ID {id} not found");
+                return this.CreateNotFoundResponse($"Bank account with ID {id} not found");
             }
             return Ok(account);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving bank account {Id}", id);
-            return StatusCode(500, $"An error occurred while retrieving bank account {id}");
+            return this.CreateInternalServerErrorResponse($"Error retrieving bank account {id}", ex);
         }
     }
 
@@ -61,12 +60,11 @@ public class BankAccountsController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return this.CreateBadRequestResponse(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating bank account");
-            return StatusCode(500, "An error occurred while creating the bank account");
+            return this.CreateInternalServerErrorResponse("Error creating bank account", ex);
         }
     }
 
@@ -77,24 +75,23 @@ public class BankAccountsController : ControllerBase
         {
             if (id != account.Id)
             {
-                return BadRequest("ID in route does not match ID in account object");
+                return this.CreateBadRequestResponse("ID in route does not match ID in account object");
             }
 
             var success = await _bankAccountService.UpdateBankAccountAsync(id, account);
             if (!success)
             {
-                return NotFound($"Bank account with ID {id} not found");
+                return this.CreateNotFoundResponse($"Bank account with ID {id} not found");
             }
             return NoContent();
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return this.CreateBadRequestResponse(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating bank account {Id}", id);
-            return StatusCode(500, $"An error occurred while updating bank account {id}");
+            return this.CreateInternalServerErrorResponse($"Error updating bank account {id}", ex);
         }
     }
 
@@ -106,14 +103,13 @@ public class BankAccountsController : ControllerBase
             var success = await _bankAccountService.DeleteBankAccountAsync(id);
             if (!success)
             {
-                return NotFound($"Bank account with ID {id} not found");
+                return this.CreateNotFoundResponse($"Bank account with ID {id} not found");
             }
             return NoContent();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting bank account {Id}", id);
-            return StatusCode(500, $"An error occurred while deleting bank account {id}");
+            return this.CreateInternalServerErrorResponse($"Error deleting bank account {id}", ex);
         }
     }
 }

@@ -1,5 +1,6 @@
 using Abstractions.DTO;
 using Abstractions.Interfaces;
+using BFB.Template.Api.Extensions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BFB.Template.Api.Controllers;
@@ -27,8 +28,7 @@ public class BankBranchesController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving all bank branches");
-            return StatusCode(500, "An error occurred while retrieving bank branches");
+            return this.CreateInternalServerErrorResponse("Error retrieving all bank branches", ex);
         }
     }
 
@@ -40,14 +40,13 @@ public class BankBranchesController : ControllerBase
             var branch = await _bankBranchRepository.GetBranchByIdAsync(id);
             if (branch == null)
             {
-                return NotFound($"Branch with ID {id} not found");
+                return this.CreateNotFoundResponse($"Branch with ID {id} not found");
             }
             return Ok(branch);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving branch {Id}", id);
-            return StatusCode(500, $"An error occurred while retrieving branch {id}");
+            return this.CreateInternalServerErrorResponse($"Error retrieving branch {id}", ex);
         }
     }
 
@@ -61,8 +60,7 @@ public class BankBranchesController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving branches for bank {BankId}", bankId);
-            return StatusCode(500, $"An error occurred while retrieving branches for bank {bankId}");
+            return this.CreateInternalServerErrorResponse($"Error retrieving branches for bank {bankId}", ex);
         }
     }
 
@@ -76,12 +74,11 @@ public class BankBranchesController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return this.CreateBadRequestResponse(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating branch");
-            return StatusCode(500, "An error occurred while creating the branch");
+            return this.CreateInternalServerErrorResponse("Error creating branch", ex);
         }
     }
 
@@ -92,24 +89,23 @@ public class BankBranchesController : ControllerBase
         {
             if (id != branch.Id)
             {
-                return BadRequest("ID in route does not match ID in branch object");
+                return this.CreateBadRequestResponse("ID in route does not match ID in branch object");
             }
 
             var success = await _bankBranchRepository.UpdateBranchAsync(id, branch);
             if (!success)
             {
-                return NotFound($"Branch with ID {id} not found");
+                return this.CreateNotFoundResponse($"Branch with ID {id} not found");
             }
             return NoContent();
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return this.CreateBadRequestResponse(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating branch {Id}", id);
-            return StatusCode(500, $"An error occurred while updating branch {id}");
+            return this.CreateInternalServerErrorResponse($"Error updating branch {id}", ex);
         }
     }
 
@@ -121,14 +117,13 @@ public class BankBranchesController : ControllerBase
             var success = await _bankBranchRepository.DeleteBranchAsync(id);
             if (!success)
             {
-                return NotFound($"Branch with ID {id} not found");
+                return this.CreateNotFoundResponse($"Branch with ID {id} not found");
             }
             return NoContent();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting branch {Id}", id);
-            return StatusCode(500, $"An error occurred while deleting branch {id}");
+            return this.CreateInternalServerErrorResponse($"Error deleting branch {id}", ex);
         }
     }
 }

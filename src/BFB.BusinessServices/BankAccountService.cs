@@ -1,4 +1,5 @@
 using Abstractions.DTO;
+using Abstractions.Exceptions;
 using Abstractions.Interfaces;
 using Microsoft.Extensions.Logging;
 
@@ -22,25 +23,48 @@ public class BankAccountService : IBankAccountService
 
     public async Task<IEnumerable<BankAccount>> GetAllBankAccountsAsync()
     {
-        var accounts = await _bankAccountRepository.GetAllBankAccountsAsync();
-        
-        // Enhance accounts with branch information
-        await EnrichAccountsWithBranchInformation(accounts);
-        
-        return accounts;
+        try
+        {
+            var accounts = await _bankAccountRepository.GetAllBankAccountsAsync();
+            
+            // Enhance accounts with branch information
+            await EnrichAccountsWithBranchInformation(accounts);
+            
+            return accounts;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving all bank accounts");
+            throw new DataAccessException("Failed to retrieve bank accounts", ex);
+        }
     }
 
     public async Task<BankAccount?> GetBankAccountByIdAsync(int id)
     {
-        var account = await _bankAccountRepository.GetBankAccountByIdAsync(id);
-        
-        if (account != null)
+        try
         {
+            var account = await _bankAccountRepository.GetBankAccountByIdAsync(id);
+            
+            if (account == null)
+            {
+                throw new ResourceNotFoundException("Bank Account", id);
+            }
+            
             // Enhance the account with branch information
             await EnrichAccountWithBranchInformation(account);
+            
+            return account;
         }
-        
-        return account;
+        catch (ResourceNotFoundException)
+        {
+            // Re-throw ResourceNotFoundException as is
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving bank account with ID: {AccountId}", id);
+            throw new DataAccessException($"Failed to retrieve bank account with ID {id}", ex);
+        }
     }
 
     public async Task<BankAccount> CreateBankAccountAsync(BankAccount bankAccountDto)
@@ -48,86 +72,146 @@ public class BankAccountService : IBankAccountService
         // Add business validation
         if (string.IsNullOrWhiteSpace(bankAccountDto.AccountNumber))
         {
-            throw new ArgumentException("Account number cannot be empty", nameof(bankAccountDto));
+            throw new BusinessValidationException("Account number cannot be empty");
         }
 
         if (string.IsNullOrWhiteSpace(bankAccountDto.OwnerName))
         {
-            throw new ArgumentException("Owner name cannot be empty", nameof(bankAccountDto));
+            throw new BusinessValidationException("Owner name cannot be empty");
         }
 
         if (bankAccountDto.Balance < 0)
         {
-            throw new ArgumentException("Initial balance cannot be negative", nameof(bankAccountDto));
+            throw new BusinessValidationException("Initial balance cannot be negative");
         }
 
-        // Validate BranchId if provided
-        if (bankAccountDto.BranchId > 0)
+        try
         {
-            var branch = await _bankBranchRepository.GetBranchByIdAsync(bankAccountDto.BranchId);
-            if (branch == null)
+            // Validate BranchId if provided
+            if (bankAccountDto.BranchId > 0)
             {
-                throw new ArgumentException($"Branch with ID {bankAccountDto.BranchId} does not exist", nameof(bankAccountDto));
+                var branch = await _bankBranchRepository.GetBranchByIdAsync(bankAccountDto.BranchId);
+                if (branch == null)
+                {
+                    throw new ResourceNotFoundException("Branch", bankAccountDto.BranchId);
+                }
+                
+                // Ensure BankId matches the branch's BankId
+                bankAccountDto.BankId = branch.BankId;
             }
+
+            // Set default values
+            bankAccountDto.CreatedDate = DateTime.UtcNow;
+            bankAccountDto.IsActive = true;
+
+            var createdAccount = await _bankAccountRepository.CreateBankAccountAsync(bankAccountDto);
             
-            // Ensure BankId matches the branch's BankId
-            bankAccountDto.BankId = branch.BankId;
+            // Enhance the newly created account with branch information
+            await EnrichAccountWithBranchInformation(createdAccount);
+            
+            return createdAccount;
         }
-
-        // Set default values
-        bankAccountDto.CreatedDate = DateTime.UtcNow;
-        bankAccountDto.IsActive = true;
-
-        var createdAccount = await _bankAccountRepository.CreateBankAccountAsync(bankAccountDto);
-        
-        // Enhance the newly created account with branch information
-        await EnrichAccountWithBranchInformation(createdAccount);
-        
-        return createdAccount;
+        catch (ResourceNotFoundException)
+        {
+            // Re-throw ResourceNotFoundException as is
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating bank account: {AccountNumber}", bankAccountDto.AccountNumber);
+            throw new DataAccessException("Failed to create bank account", ex);
+        }
     }
 
     public async Task<bool> UpdateBankAccountAsync(int id, BankAccount bankAccountDto)
     {
-        // Verify that the account exists
-        var existingAccount = await _bankAccountRepository.GetBankAccountByIdAsync(id);
-        if (existingAccount == null)
-        {
-            return false;
-        }
-
         // Add business validation
         if (string.IsNullOrWhiteSpace(bankAccountDto.AccountNumber))
         {
-            throw new ArgumentException("Account number cannot be empty", nameof(bankAccountDto));
+            throw new BusinessValidationException("Account number cannot be empty");
         }
 
         if (string.IsNullOrWhiteSpace(bankAccountDto.OwnerName))
         {
-            throw new ArgumentException("Owner name cannot be empty", nameof(bankAccountDto));
+            throw new BusinessValidationException("Owner name cannot be empty");
         }
 
-        // Validate BranchId if it's changing
-        if (bankAccountDto.BranchId > 0 && bankAccountDto.BranchId != existingAccount.BranchId)
+        try
         {
-            var branch = await _bankBranchRepository.GetBranchByIdAsync(bankAccountDto.BranchId);
-            if (branch == null)
+            // Verify that the account exists
+            var existingAccount = await _bankAccountRepository.GetBankAccountByIdAsync(id);
+            if (existingAccount == null)
             {
-                throw new ArgumentException($"Branch with ID {bankAccountDto.BranchId} does not exist", nameof(bankAccountDto));
+                throw new ResourceNotFoundException("Bank Account", id);
+            }
+
+            // Validate BranchId if it's changing
+            if (bankAccountDto.BranchId > 0 && bankAccountDto.BranchId != existingAccount.BranchId)
+            {
+                var branch = await _bankBranchRepository.GetBranchByIdAsync(bankAccountDto.BranchId);
+                if (branch == null)
+                {
+                    throw new ResourceNotFoundException("Branch", bankAccountDto.BranchId);
+                }
+                
+                // Ensure BankId matches the branch's BankId
+                bankAccountDto.BankId = branch.BankId;
+            }
+
+            // Preserve creation date from the existing account
+            bankAccountDto.CreatedDate = existingAccount.CreatedDate;
+
+            var result = await _bankAccountRepository.UpdateBankAccountAsync(id, bankAccountDto);
+            if (!result)
+            {
+                throw new DataAccessException($"Failed to update bank account with ID {id}");
             }
             
-            // Ensure BankId matches the branch's BankId
-            bankAccountDto.BankId = branch.BankId;
+            return true;
         }
-
-        // Preserve creation date from the existing account
-        bankAccountDto.CreatedDate = existingAccount.CreatedDate;
-
-        return await _bankAccountRepository.UpdateBankAccountAsync(id, bankAccountDto);
+        catch (ResourceNotFoundException)
+        {
+            // Re-throw ResourceNotFoundException as is
+            throw;
+        }
+        catch (BusinessValidationException)
+        {
+            // Re-throw BusinessValidationException as is
+            throw;
+        }
+        catch (DataAccessException)
+        {
+            // Re-throw DataAccessException as is
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating bank account with ID: {AccountId}", id);
+            throw new DataAccessException($"Failed to update bank account with ID {id}", ex);
+        }
     }
 
     public async Task<bool> DeleteBankAccountAsync(int id)
     {
-        return await _bankAccountRepository.DeleteBankAccountAsync(id);
+        try
+        {
+            var result = await _bankAccountRepository.DeleteBankAccountAsync(id);
+            if (!result)
+            {
+                throw new ResourceNotFoundException("Bank Account", id);
+            }
+            return true;
+        }
+        catch (ResourceNotFoundException)
+        {
+            // Re-throw ResourceNotFoundException as is
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting bank account with ID: {AccountId}", id);
+            throw new DataAccessException($"Failed to delete bank account with ID {id}", ex);
+        }
     }
     
     // Helper methods to enrich account information with branch details
